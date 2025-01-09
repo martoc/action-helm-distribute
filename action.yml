@@ -63,6 +63,7 @@ runs:
       run: |
         gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin https://${{ inputs.source_region }}-docker.pkg.dev
         helm pull oci://${{ inputs.source_region }}-docker.pkg.dev/${{ inputs.source_gcp_project_id }}/${{ inputs.chart_name }} --version "${{ inputs.chart_version }}"
+        ls -l
       if: ${{ inputs.source_registry == 'gcp' }}
     - uses: google-github-actions/auth@v2
       with:
