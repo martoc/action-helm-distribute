@@ -73,5 +73,5 @@ runs:
       shell: bash
       run: |
         gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin https://${{ inputs.target_region }}-docker.pkg.dev
-        helm push $(basename ${{ inputs.chart_name }}-${{ inputs.chart_version }}.tgz) oci://${{ inputs.target_region }}-docker.pkg.dev/${{ inputs.target_gcp_project_id }}/${{ inputs.chart_name }}
+        helm push $(basename ${{ inputs.chart_name }}-${{ inputs.chart_version }}.tgz) oci://${{ inputs.target_region }}-docker.pkg.dev/${{ inputs.target_gcp_project_id }}/$(basedir ${{ inputs.chart_name }})
       if: ${{ inputs.target_registry == 'gcp' }}
