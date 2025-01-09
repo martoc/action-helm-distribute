@@ -39,11 +39,11 @@ inputs:
   target_gcp_project_id:
     description: "Google Cloud Project ID"
     required: false
-  helm_chart:
+  chart_name:
     description: "Helm chart in the format namespace/chart"
     required: true
-  helm_chart_version:
-    description: "Helm chart version"
+  chart_version:
+    description: "Helm chart chart_name"
     required: true
 runs:
   using: "composite"
@@ -51,7 +51,7 @@ runs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
       with:
-        version: 499.0.0
+        chart_name: 499.0.0
       if: ${{ inputs.source_registry == 'gcp' || inputs.target_registry == 'gcp' }}
     - uses: google-github-actions/auth@v2
       with:
@@ -62,7 +62,7 @@ runs:
       shell: bash
       run: |
         gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin https://${{ inputs.source_region }}-docker.pkg.dev
-        helm pull oci://${{ inputs.source_region }}-docker.pkg.dev/${{ inputs.source_gcp_project_id }}/${{ inputs.helm_chart }} --version "${{ inputs.helm_chart_version }}"
+        helm pull oci://${{ inputs.source_region }}-docker.pkg.dev/${{ inputs.source_gcp_project_id }}/${{ inputs.chart_name }} --version "${{ inputs.chart_version }}"
       if: ${{ inputs.source_registry == 'gcp' }}
     - uses: google-github-actions/auth@v2
       with:
@@ -73,5 +73,5 @@ runs:
       shell: bash
       run: |
         gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin https://${{ inputs.target_region }}-docker.pkg.dev
-        helm push ${{ inputs.helm_chart }}.tar.gz oci://${{ inputs.target_region }}-docker.pkg.dev/${{ inputs.target_gcp_project_id }}/${{ inputs.helm_chart }}
+        helm push ${{ inputs.chart_name }}.tar.gz oci://${{ inputs.target_region }}-docker.pkg.dev/${{ inputs.target_gcp_project_id }}/${{ inputs.chart_name }}
       if: ${{ inputs.target_registry == 'gcp' }}
