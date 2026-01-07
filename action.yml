@@ -15,11 +15,16 @@ inputs:
     required: false
   source_region:
     description: |
-      Region to push the helm to.
-      Valid values: Google Cloud.
+      Region to pull the helm chart from.
+      Valid values: Google Cloud or AWS regions.
     required: false
+    default: ""
   source_gcp_project_id:
     description: "Google Cloud Project ID"
+    required: false
+    default: ""
+  source_aws_role_arn:
+    description: "AWS IAM Role ARN for OIDC authentication"
     required: false
     default: ""
   target_registry:
@@ -33,12 +38,18 @@ inputs:
     required: false
   target_region:
     description: |
-      Region to push the container to.
+      Region to push the helm chart to.
       Valid values: Google Cloud or AWS regions.
     required: false
+    default: ""
   target_gcp_project_id:
     description: "Google Cloud Project ID"
     required: false
+    default: ""
+  target_aws_role_arn:
+    description: "AWS IAM Role ARN for OIDC authentication"
+    required: false
+    default: ""
   chart_name:
     description: "Helm chart in the format namespace/chart"
     required: true
@@ -51,27 +62,65 @@ runs:
     - name: Set up Cloud SDK
       uses: google-github-actions/setup-gcloud@v2
       with:
-        chart_name: 499.0.0
+        version: 499.0.0
       if: ${{ inputs.source_registry == 'gcp' || inputs.target_registry == 'gcp' }}
     - uses: google-github-actions/auth@v2
       with:
         workload_identity_provider: ${{ inputs.source_workload_identity_provider }}
         service_account: ${{ inputs.source_service_account }}
       if: ${{ inputs.source_registry == 'gcp' }}
-    - name: Pull image from source
+    - name: Pull chart from GCP source
       shell: bash
       run: |
         gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin https://${{ inputs.source_region }}-docker.pkg.dev
         helm pull oci://${{ inputs.source_region }}-docker.pkg.dev/${{ inputs.source_gcp_project_id }}/${{ inputs.chart_name }} --version "${{ inputs.chart_version }}"
       if: ${{ inputs.source_registry == 'gcp' }}
+    - name: Configure AWS credentials for source
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.source_aws_role_arn }}
+        aws-region: ${{ inputs.source_region }}
+      if: ${{ inputs.source_registry == 'aws' }}
+    - name: Pull chart from AWS ECR source
+      shell: bash
+      run: |
+        SOURCE_AWS_ACCOUNT_ID=$(echo "${{ inputs.source_aws_role_arn }}" | cut -d':' -f5)
+        if [[ -z "${SOURCE_AWS_ACCOUNT_ID}" ]]; then
+          echo "Error: Failed to extract AWS account ID from source_aws_role_arn ('${{ inputs.source_aws_role_arn }}')." >&2
+          echo "Please ensure it is a valid IAM role ARN, e.g., arn:aws:iam::<account-id>:role/<role-name>." >&2
+          exit 1
+        fi
+        aws ecr get-login-password --region ${{ inputs.source_region }} | \
+          helm registry login --username AWS --password-stdin "${SOURCE_AWS_ACCOUNT_ID}.dkr.ecr.${{ inputs.source_region }}.amazonaws.com"
+        helm pull "oci://${SOURCE_AWS_ACCOUNT_ID}.dkr.ecr.${{ inputs.source_region }}.amazonaws.com/${{ inputs.chart_name }}" --version "${{ inputs.chart_version }}"
+      if: ${{ inputs.source_registry == 'aws' }}
     - uses: google-github-actions/auth@v2
       with:
         workload_identity_provider: ${{ inputs.target_workload_identity_provider }}
         service_account: ${{ inputs.target_service_account }}
       if: ${{ inputs.target_registry == 'gcp' }}
-    - name: Push image to target
+    - name: Push chart to GCP target
       shell: bash
       run: |
         gcloud auth print-access-token | helm registry login -u oauth2accesstoken --password-stdin https://${{ inputs.target_region }}-docker.pkg.dev
         helm push $(basename ${{ inputs.chart_name }}-${{ inputs.chart_version }}.tgz) oci://${{ inputs.target_region }}-docker.pkg.dev/${{ inputs.target_gcp_project_id }}/$(dirname ${{ inputs.chart_name }})
       if: ${{ inputs.target_registry == 'gcp' }}
+    - name: Configure AWS credentials for target
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ inputs.target_aws_role_arn }}
+        aws-region: ${{ inputs.target_region }}
+      if: ${{ inputs.target_registry == 'aws' }}
+    - name: Push chart to AWS ECR target
+      shell: bash
+      run: |
+        TARGET_AWS_ACCOUNT_ID=$(echo "${{ inputs.target_aws_role_arn }}" | cut -d':' -f5)
+        if [[ -z "${TARGET_AWS_ACCOUNT_ID}" ]]; then
+          echo "Error: Failed to extract AWS account ID from target_aws_role_arn ('${{ inputs.target_aws_role_arn }}')." >&2
+          echo "Please ensure it is a valid IAM role ARN, e.g., arn:aws:iam::<account-id>:role/<role-name>." >&2
+          exit 1
+        fi
+        aws ecr get-login-password --region ${{ inputs.target_region }} | \
+          helm registry login --username AWS --password-stdin "${TARGET_AWS_ACCOUNT_ID}.dkr.ecr.${{ inputs.target_region }}.amazonaws.com"
+        helm push $(basename ${{ inputs.chart_name }}-${{ inputs.chart_version }}.tgz) "oci://${TARGET_AWS_ACCOUNT_ID}.dkr.ecr.${{ inputs.target_region }}.amazonaws.com/$(dirname ${{ inputs.chart_name }})"
+      if: ${{ inputs.target_registry == 'aws' }}
