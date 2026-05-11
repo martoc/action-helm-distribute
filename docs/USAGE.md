@@ -47,7 +47,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Distribute Helm chart
         uses: martoc/action-helm-distribute@v1
@@ -81,7 +81,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Distribute Helm chart
         uses: martoc/action-helm-distribute@v1
@@ -111,7 +111,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Distribute Helm chart
         uses: martoc/action-helm-distribute@v1
@@ -143,7 +143,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Distribute Helm chart
         uses: martoc/action-helm-distribute@v1
